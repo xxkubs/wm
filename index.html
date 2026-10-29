@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wróbel Motors - System Warsztatowy 2.0</title>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+    <style>
+        :root {
+            --bg-dark: #0f0a0c;
+            --bg-card: #1a1114;
+            --border: #4a151b;
+            --red-main: #dc2626;
+            --red-hover: #b91c1c;
+            --text-light: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+        body { background-color: var(--bg-dark); color: var(--text-light); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        
+        /* EKRAN LOGOWANIA */
+        #loginOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 10, 12, 0.98); z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .login-box {
+            background: var(--bg-card); border: 2px solid var(--border);
+            padding: 35px; border-radius: 14px; width: 340px; text-align: center;
+            box-shadow: 0 10px 30px rgba(220, 38, 38, 0.2);
+        }
+        .login-box h2 { color: #f87171; margin-top: 0; }
+
+        /* GŁÓWNY KONTENER */
+        .container { max-width: 1450px; margin: 0 auto; padding: 20px; display: none; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .top-bar h1 { color: #f87171; margin: 0; font-size: 24px; }
+        
+        /* ZAKŁADKI */
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { background: var(--bg-card); color: var(--text-light); border: 1px solid var(--border); padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .tab-btn:hover { border-color: #f87171; }
+        .tab-btn.active { background-color: var(--red-main); border-color: var(--red-main); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* KARTY I FORMULARZE */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .card h2 { color: #f87171; margin-top: 0; font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+        label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 9px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 6px; color: #fff; box-sizing: border-box; font-size: 13px; }
+        .checkbox-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px; padding: 12px; background: var(--bg-dark); border-radius: 8px; border: 1px dashed var(--border); }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #fff; cursor: pointer; }
+        .checkbox-label input { width: 18px; height: 18px; accent-color: var(--red-main); }
+
+        button { background-color: var(--red-main); color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background-color: var(--red-hover); }
+        .btn-sm { padding: 6px 10px; font-size: 12px; margin-right: 4px; }
+        .btn-edit { background-color: #2563eb; }
+        .btn-edit:hover { background-color: #1d4ed8; }
+        .btn-del { background-color: #7f1d1d; }
+        .btn-success { background-color: #16a34a; }
+
+        /* TABELE */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { padding: 11px 8px; text-align: left; border-bottom: 1px solid #2e1014; vertical-align: middle; }
+        th { color: #f87171; background-color: var(--bg-dark); position: sticky; top: 0; }
+        .badge { display: inline-block; padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: bold; margin: 2px; }
+        .badge-client-parts { background: #eab308; color: #000; }
+        .badge-oil { background: #3b82f6; color: #fff; }
+        .badge-fluid { background: #8b5cf6; color: #fff; }
+
+        /* STATYSTYKI I MAGAZYN */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; text-align: center; }
+        .stat-box h3 { margin: 0; color: var(--text-muted); font-size: 13px; }
+        .stat-box p { font-size: 24px; font-weight: bold; color: #f87171; margin: 8px 0 0 0; }
+        .mag-alarm { background: rgba(220, 38, 38, 0.25) !important; border: 1px solid #ef4444 !important; }
+
+        /* MODAL EDYCJI */
+        #editModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 5000;
+            display: none; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;
+        }
+        .modal-content {
+            background: var(--bg-card); border: 2px solid var(--red-main);
+            border-radius: 12px; padding: 25px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto;
+        }
+
+        /* KALENDARZ */
+        #calendar { background: var(--bg-card); padding: 15px; border-radius: 10px; }
+        .fc-toolbar-title { color: #ffffff !important; }
+        .fc-button-primary { background-color: var(--red-main) !important; border-color: var(--red-main) !important; }
+    </style>
+</head>
+<body>
+
+    <!-- EKRAN LOGOWANIA -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>🔒 Wróbel Motors</h2>
+            <p style="color:#9ca3af; font-size:13px; margin-bottom:20px;">Zaloguj się do systemu warsztatowego</p>
+            <div style="text-align:left; margin-bottom:12px;">
+                <label>Mechanik / Użytkownik</label>
+                <select id="loginUser">
+                    <option value="Kuba">Kuba</option>
+                    <option value="Damian">Damian</option>
+                </select>
+            </div>
+            <div style="text-align:left; margin-bottom:20px;">
+                <label>Hasło (wpisz: warsztat123)</label>
+                <input type="password" id="loginPass" value="warsztat123" placeholder="Wpisz hasło..." onkeypress="if(event.key==='Enter') zaloguj()">
+            </div>
+            <button type="button" onclick="zaloguj()" style="width:100%; padding:12px;">Zaloguj się</button>
+            <p id="loginErr" style="color:#ef4444; font-size:13px; margin-top:10px; display:none;">Błędne hasło! Wpisz: warsztat123</p>
+        </div>
+    </div>
+
+    <!-- GŁÓWNA APLIKACJA -->
+    <div class="container" id="mainApp">
+        <div class="top-bar">
+            <h1>🔧 Wróbel Motors - System Warsztatowy 2.0</h1>
+            <div>
+                <span id="serverStatus" style="margin-right:15px; font-size:13px; padding:4px 8px; border-radius:4px; background:#374151;">⏳ Łączenie z bazą...</span>
+                <span id="loggedUserText" style="margin-right:15px; color:#9ca3af; font-size:14px;"></span>
+                <button class="btn-sm btn-del" onclick="wyloguj()">Wyloguj</button>
+            </div>
+        </div>
+
+        <!-- ZAKŁADKI NAWIGACYJNE -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="zmienZakladke('zlecenia', this)">📋 Zlecenia i Dodawanie</button>
+            <button class="tab-btn" onclick="zmienZakladke('kalendarz', this)">📅 Kalendarz Rezerwacji</button>
+            <button class="tab-btn" onclick="zmienZakladke('klienci', this)">👥 Baza Klientów</button>
+            <button class="tab-btn" onclick="zmienZakladke('magazyn', this)">🛢️ Stan Magazynowy (Oleje i Płyny)</button>
+            <button class="tab-btn" onclick="zmienZakladke('bilanse', this)">💰 Bilanse i Finanse (Kuba / Damian)</button>
+        </div>
+
+        <!-- ZAKŁADKA 1: ZLECENIA -->
+        <div id="tab-zlecenia" class="tab-content active">
+            <div class="card">
+                <h2>➕ Przyjmij Nowe Auto / Dodaj Zlecenie</h2>
+                <form id="zlecenieForm">
+                    <div class="form-grid">
+                        <div><label>ID Zlecenia</label><input type="text" id="id_zlecenia" placeholder="np. ZL/01/10" required></div>
+                        <div><label>Klient (Imię i Nazwisko)</label><input type="text" id="klient" required></div>
+                        <div><label>Telefon</label><input type="text" id="telefon" placeholder="np. 500600700"></div>
+                        <div><label>Pojazd (Marka i Model)</label><input type="text" id="pojazd" placeholder="np. Audi A4 2.0 TDI" required></div>
+                        <div><label>Nr Rejestracyjny</label><input type="text" id="nr_rejestracyjny"></div>
+                        <div><label>VIN / Stock ID</label><input type="text" id="vin"></div>
+                        <div><label>Mechanik Prowadzący</label><select id="mechanik"><option value="Kuba">Kuba</option><option value="Damian">Damian</option></select></div>
+                        <div><label>Data Przyjęcia</label><input type="date" id="data_przyjecia" required></div>
+                        <div><label>Planowane Zakończenie</label><input type="date" id="data_zakonczenia"></div>
+                        
+                        <div>
+                            <label>Wybierz Olej z Magazynu</label>
+                           <select id="olej_select">
+    <option value="0|Brak">Brak wymiany oleju</option>
+</select>
+                        </div>
+                        <div>
+                            <label>Ilość Oleju (Litry - odejmie z magazynu)</label>
+                            <input type="number" step="0.1" id="olej_ilosc" value="0">
+                        </div>
+
+                        <div>
+                            <label>Status Naprawy (4 opcje)</label>
+                            <select id="status_naprawy">
+                                <option value="🟡 Oczekuje na części">🟡 Oczekuje na części</option>
+                                <option value="🔵 W trakcie naprawy">🔵 W trakcie naprawy</option>
+                                <option value="🟢 Gotowe do odbioru">🟢 Gotowe do odbioru</option>
+                                <option value="⚪ Wydane / Rozliczone">⚪ Wydane / Rozliczone</option>
+                            </select>
+                        </div>
+
+                        <div><label>Koszt Części Naszych (zł)</label><input type="number" step="0.01" id="koszt_czesci" value="0"></div>
+                        <div><label>Koszt Robocizny (zł)</label><input type="number" step="0.01" id="koszt_robocizny" value="0"></div>
+                        <div><label>Wpłacono / Zaliczka (zł)</label><input type="number" step="0.01" id="wplacono" value="0"></div>
+                        <div><label>Opis Części / Zakres Prac</label><input type="text" id="opis_czesci" placeholder="np. Rozrząd, filtry, klocki przód"></div>
+                    </div>
+
+                    <div class="checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="czesci_klienta"> 📦 Klient dostarczył własne części
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="plyn_hamulcowy"> 🛑 Wymiana płynu hamulcowego (-1L z magazynu)
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="plyn_chlodniczy"> ❄️ Wymiana płynu chłodniczego (-5L z magazynu)
+                        </label>
+                    </div>
+
+                    <button type="submit" style="margin-top:15px;">💾 Zapisz Zlecenie i Zaktualizuj Magazyn</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>📋 Aktywne i Archiwalne Zlecenia (Szybka zmiana statusu i pełna edycja)</h2>
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID / Daty</th>
+                                <th>Pojazd / VIN</th>
+                                <th>Klient</th>
+                                <th>Mechanik</th>
+                                <th>Części, Oleje i Płyny</th>
+                                <th>Rozliczenie (zł)</th>
+                                <th>Status (Zmień z listy)</th>
+                                <th>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaZlecen"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ZAKŁADKA 2: KALENDARZ -->
+        <div id="tab-kalendarz" class="tab-content">
+            <div class="card">
+                <h2>📅 Kalendarz Rezerwacji i Napraw</h2>
+                <div id='calendar'></div>
+            </div>
+        </div>
+
+        <!-- ZAKŁADKA 3: BAZA KLIENTÓW -->
+        <div id="tab-klienci" class="tab-content">
+            <div class="card">
+                <h2>👥 Baza Klientów i Historia Pojazdów</h2>
+                <input type="text" id="szukajKlienta" placeholder="🔍 Szukaj klienta po nazwisku, telefonie lub aucie..." oninput="renderujBazeKlientow()" style="margin-bottom:15px; max-width:400px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Klient</th>
+                            <th>Telefon</th>
+                            <th>Obsługiwane Pojazdy</th>
+                            <th>Liczba Zleceń</th>
+                            <th>Łącznie Zostawił (zł)</th>
+                            <th>Szybki Kontakt</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaKlientow"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ZAKŁADKA 4: STAN MAGAZYNOWY -->
+        <div id="tab-magazyn" class="tab-content">
+            <div class="card">
+                <h2>🛢️ Dodaj Nowy Olej / Płyn do Magazynu</h2>
+                <div class="form-grid">
+                    <div><label>Nazwa produktu</label><input type="text" id="magNazwa" placeholder="np. Olej 5W30 Motul"></div>
+                    <div>
+                        <label>Kategoria</label>
+                        <select id="magKat">
+                            <option value="Olej silnikowy">Olej silnikowy</option>
+                            <option value="Płyn eksploatacyjny">Płyn eksploatacyjny</option>
+                            <option value="Chemia warsztatowa">Chemia warsztatowa</option>
+                        </select>
+                    </div>
+                    <div><label>Ilość początkowa</label><input type="number" step="0.5" id="magIlosc" value="20"></div>
+                    <div><label>Jednostka</label><input type="text" id="magJedn" value="L"></div>
+                    <div><label>Cena za litr/szt (zł)</label><input type="number" step="0.5" id="magCena" value="40"></div>
+                    <div><label>Alarm poniżej (minimum)</label><input type="number" step="0.5" id="magAlarm" value="10"></div>
+                </div>
+                <button onclick="dodajProduktMagazyn()" style="margin-top:12px;">➕ Dodaj pozycję do magazynu</button>
+            </div>
+
+            <div class="card">
+                <h2>📦 Aktualne Stany Magazynowe (Automatycznie odliczane przy zleceniach)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Kategoria</th>
+                            <th>Aktualny Stan</th>
+                            <th>Próg Alarmowy</th>
+                            <th>Cena / jedn.</th>
+                            <th>Szybka Dostawa / Korekta</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaMagazyn"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ZAKŁADKA 5: BILANSE I FINANSE -->
+        <div id="tab-bilanse" class="tab-content">
+            <h2>💰 Podsumowanie Finansowe Warsztatu</h2>
+            <div class="stats-grid">
+                <div class="stat-box"><h3>Wszystkie Zlecenia</h3><p id="bWszystkie">0</p></div>
+                <div class="stat-box"><h3>Czysty Zysk (Robocizna)</h3><p id="bRobocizna" style="color:#4ade80;">0.00 zł</p></div>
+                <div class="stat-box"><h3>Koszt Części</h3><p id="bCzesci">0.00 zł</p></div>
+                <div class="stat-box"><h3>Łączny Obrót (Części + Robocizna)</h3><p id="bObrot">0.00 zł</p></div>
+                <div class="stat-box"><h3>Wpłacono przez Klientów</h3><p id="bWplacono">0.00 zł</p></div>
+                <div class="stat-box"><h3>Do Dopłaty przez Klientów</h3><p id="bDoZapl" style="color:#facc15;">0.00 zł</p></div>
+            </div>
+
+            <h2>👨‍🔧 Podział Zysków z Robocizny na Mechaników</h2>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <h3>🔧 Kuba - Wypracowana Robocizna</h3>
+                    <p id="bKubaRob">0.00 zł</p>
+                    <small id="bKubaAuta" style="color:#9ca3af;">0 aut</small>
+                </div>
+                <div class="stat-box">
+                    <h3>🔧 Damian - Wypracowana Robocizna</h3>
+                    <p id="bDamianRob">0.00 zł</p>
+                    <small id="bDamianAuta" style="color:#9ca3af;">0 aut</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OKNO MODALNE DO PEŁNEJ EDYCJI ZLECENIA -->
+    <div id="editModal">
+        <div class="modal-content">
+            <h2 style="color:#f87171; margin-top:0;">✏️ Edycja Zlecenia</h2>
+            <input type="hidden" id="edit_id">
+            <div class="form-grid">
+                <div><label>ID Zlecenia</label><input type="text" id="edit_id_zlecenia"></div>
+                <div><label>Klient</label><input type="text" id="edit_klient"></div>
+                <div><label>Telefon</label><input type="text" id="edit_telefon"></div>
+                <div><label>Pojazd</label><input type="text" id="edit_pojazd"></div>
+                <div><label>Nr Rejestracyjny</label><input type="text" id="edit_nr_rej"></div>
+                <div><label>VIN / Stock ID</label><input type="text" id="edit_vin"></div>
+                <div><label>Mechanik</label><select id="edit_mechanik"><option value="Kuba">Kuba</option><option value="Damian">Damian</option></select></div>
+                <div><label>Data Przyjęcia</label><input type="date" id="edit_data_przyj"></div>
+                <div><label>Data Zakończenia</label><input type="date" id="edit_data_zak"></div>
+                <div>
+                    <label>Status Naprawy</label>
+                    <select id="edit_status">
+                        <option value="🟡 Oczekuje na części">🟡 Oczekuje na części</option>
+                        <option value="🔵 W trakcie naprawy">🔵 W trakcie naprawy</option>
+                        <option value="🟢 Gotowe do odbioru">🟢 Gotowe do odbioru</option>
+                        <option value="⚪ Wydane / Rozliczone">⚪ Wydane / Rozliczone</option>
+                    </select>
+                </div>
+                <div><label>Koszt Części (zł)</label><input type="number" step="0.01" id="edit_czesci"></div>
+                <div><label>Koszt Robocizny (zł)</label><input type="number" step="0.01" id="edit_robocizna"></div>
+                <div><label>Wpłacono (zł)</label><input type="number" step="0.01" id="edit_wplacono"></div>
+                <div><label>Opis Części / Prac</label><input type="text" id="edit_opis"></div>
+                <div><label>Użyty Olej</label><input type="text" id="edit_olej_nazwa"></div>
+                <div><label>Ilość Oleju (L)</label><input type="number" step="0.1" id="edit_olej_ilosc"></div>
+            </div>
+            <div class="checkbox-row">
+                <label class="checkbox-label"><input type="checkbox" id="edit_czesci_klienta"> 📦 Części klienta</label>
+                <label class="checkbox-label"><input type="checkbox" id="edit_hamulcowy"> 🛑 Płyn hamulcowy</label>
+                <label class="checkbox-label"><input type="checkbox" id="edit_chlodniczy"> ❄️ Płyn chłodniczy</label>
+            </div>
+            <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn-del" onclick="zamknijModal()">Anuluj</button>
+                <button class="btn-success" onclick="zapiszEdycje()">💾 Zapisz Zmiany</button>
+            </div>
+        </div>
+    </div>
+
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script>
+        const API = 'http://127.0.0.1:8000/api';
+        let wszystkieZlecenia = [];
+        let magazynDane = [];
+        let calendar;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('data_przyjecia').valueAsDate = new Date();
+            const savedUser = sessionStorage.getItem('wrobel_user');
+            if (savedUser) {
+                pokazAplikacje(savedUser);
+            }
+        });
+
+        // NATYCHMIASTOWE LOGOWANIE BEZ BLOKAD PRZEGLĄDARKI
+        function zaloguj() {
+            const uzytkownik = document.getElementById('loginUser').value;
+            const haslo = document.getElementById('loginPass').value.trim();
+            
+            if (haslo === 'warsztat123' || haslo === '1234') {
+                sessionStorage.setItem('wrobel_user', uzytkownik);
+                pokazAplikacje(uzytkownik);
+            } else {
+                document.getElementById('loginErr').style.display = 'block';
+            }
+        }
+
+        function wyloguj() {
+            sessionStorage.removeItem('wrobel_user');
+            location.reload();
+        }
+
+        function pokazAplikacje(user) {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('loggedUserText').innerText = `Zalogowany: 🔧 ${user}`;
+            document.getElementById('mechanik').value = user;
+            
+            inicjalizujKalendarz();
+            odswiezWszystko();
+        }
+
+        function zmienZakladke(nazwa, btn) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + nazwa).classList.add('active');
+            btn.classList.add('active');
+            if (nazwa === 'kalendarz' && calendar) {
+                setTimeout(() => calendar.updateSize(), 50);
+            }
+        }
+
+        function inicjalizujKalendarz() {
+            let calendarEl = document.getElementById('calendar');
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'pl',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek'
+                },
+                events: function(fetchInfo, successCallback) {
+                    const events = wszystkieZlecenia.map(item => {
+                        let color = '#dc2626';
+                        if (item.status_naprawy.includes('Gotowe')) color = '#16a34a';
+                        else if (item.status_naprawy.includes('W trakcie')) color = '#2563eb';
+                        else if (item.status_naprawy.includes('Wydane')) color = '#4b5563';
+                        return {
+                            title: `🚗 ${item.pojazd} (${item.klient}) - ${item.mechanik}`,
+                            start: item.data_przyjecia,
+                            end: item.data_zakonczenia ? item.data_zakonczenia : item.data_przyjecia,
+                            backgroundColor: color
+                        };
+                    });
+                    successCallback(events);
+                }
+            });
+            calendar.render();
+        }
+
+        function odswiezWszystko() {
+            pobierzMagazyn();
+            pobierzZlecenia();
+        }
+
+        function pobierzZlecenia() {
+            fetch(`${API}/zlecenia`)
+                .then(res => {
+                    if (!res.ok) throw new Error();
+                    return res.json();
+                })
+                .then(data => {
+                    const st = document.getElementById('serverStatus');
+                    st.innerText = '🟢 Połączono z bazą';
+                    st.style.background = '#16a34a';
+                    wszystkieZlecenia = data;
+                    renderujTabeleZlecen();
+                    renderujBazeKlientow();
+                    przeliczBilanse();
+                    if (calendar) calendar.refetchEvents();
+                })
+                .catch(() => {
+                    const st = document.getElementById('serverStatus');
+                    st.innerText = '🔴 Serwer wyłączony w PowerShellu!';
+                    st.style.background = '#dc2626';
+                });
+        }
+
+        function renderujTabeleZlecen() {
+            const tbody = document.getElementById('tabelaZlecen');
+            tbody.innerHTML = '';
+
+            const opcjeStatusow = [
+                "🟡 Oczekuje na części",
+                "🔵 W trakcie naprawy",
+                "🟢 Gotowe do odbioru",
+                "⚪ Wydane / Rozliczone"
+            ];
+
+            wszystkieZlecenia.forEach(item => {
+                const doZaplaty = (item.koszt_czesci + item.koszt_robocizny - item.wplacono).toFixed(2);
+                
+                let badges = '';
+                if (item.czesci_klienta === 1) badges += `<span class="badge badge-client-parts">📦 Części klienta</span>`;
+                if (item.olej_nazwa && item.olej_nazwa !== 'Brak' && item.olej_ilosc > 0) {
+                    badges += `<span class="badge badge-oil">🛢️ ${item.olej_nazwa} (${item.olej_ilosc}L)</span>`;
+                }
+                if (item.plyn_hamulcowy === 1) badges += `<span class="badge badge-fluid">🛑 Płyn hamulcowy</span>`;
+                if (item.plyn_chlodniczy === 1) badges += `<span class="badge badge-fluid">❄️ Płyn chłodniczy</span>`;
+
+                let selectHtml = `<select onchange="zmienStatusSzybko(${item.id}, this.value)" style="padding:5px; font-weight:bold;">`;
+                opcjeStatusow.forEach(st => {
+                    const sel = (item.status_naprawy === st) ? 'selected' : '';
+                    selectHtml += `<option value="${st}" ${sel}>${st}</option>`;
+                });
+                selectHtml += `</select>`;
+
+                tbody.innerHTML += `<tr>
+                    <td><b>${item.id_zlecenia}</b><br><small style="color:#9ca3af;">Przyj: ${item.data_przyjecia}<br>Koniec: ${item.data_zakonczenia || '-'}</small></td>
+                    <td><b>${item.pojazd}</b><br><small>${item.nr_rejestracyjny || ''} | ${item.vin || ''}</small></td>
+                    <td><b>${item.klient}</b><br><small>📞 ${item.telefon || '-'}</small></td>
+                    <td><b>${item.mechanik}</b></td>
+                    <td>${item.opis_czesci || '-'}<br>${badges}</td>
+                    <td>
+                        Części: ${(item.koszt_czesci || 0).toFixed(2)} zł<br>
+                        Robocizna: <b>${(item.koszt_robocizny || 0).toFixed(2)} zł</b><br>
+                        Wpłacono: ${(item.wplacono || 0).toFixed(2)} zł<br>
+                        <span style="color:${doZaplaty > 0 ? '#facc15' : '#4ade80'};">Do zapłaty: ${doZaplaty} zł</span>
+                    </td>
+                    <td>${selectHtml}</td>
+                    <td>
+                        <button class="btn-sm btn-edit" onclick="otworzEdycje(${item.id})">✏️ Edytuj</button>
+                        <button class="btn-sm btn-del" onclick="usunZlecenie(${item.id})">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        function zmienStatusSzybko(id, nowyStatus) {
+            fetch(`${API}/zlecenia/${id}/status`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ status_naprawy: nowyStatus })
+            }).then(() => pobierzZlecenia());
+        }
+
+        document.getElementById('zlecenieForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const olejVal = document.getElementById('olej_select').value.split('|');
+            const data = {
+                id_zlecenia: document.getElementById('id_zlecenia').value,
+                klient: document.getElementById('klient').value,
+                telefon: document.getElementById('telefon').value,
+                pojazd: document.getElementById('pojazd').value,
+                nr_rejestracyjny: document.getElementById('nr_rejestracyjny').value,
+                vin: document.getElementById('vin').value,
+                mechanik: document.getElementById('mechanik').value,
+                data_przyjecia: document.getElementById('data_przyjecia').value,
+                data_zakonczenia: document.getElementById('data_zakonczenia').value,
+                olej_id: parseInt(olejVal[0]) || 0,
+                olej_nazwa: olejVal[1] || "Brak",
+                olej_ilosc: parseFloat(document.getElementById('olej_ilosc').value) || 0,
+                status_naprawy: document.getElementById('status_naprawy').value,
+                koszt_czesci: parseFloat(document.getElementById('koszt_czesci').value) || 0,
+                koszt_robocizny: parseFloat(document.getElementById('koszt_robocizny').value) || 0,
+                wplacono: parseFloat(document.getElementById('wplacono').value) || 0,
+                opis_czesci: document.getElementById('opis_czesci').value,
+                czesci_klienta: document.getElementById('czesci_klienta').checked ? 1 : 0,
+                plyn_hamulcowy: document.getElementById('plyn_hamulcowy').checked ? 1 : 0,
+                plyn_chlodniczy: document.getElementById('plyn_chlodniczy').checked ? 1 : 0
+            };
+
+            fetch(`${API}/zlecenia`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(res => {
+                if (!res.ok) return res.json().then(err => { throw new Error(err.detail); });
+                document.getElementById('zlecenieForm').reset();
+                document.getElementById('data_przyjecia').valueAsDate = new Date();
+                odswiezWszystko();
+            }).catch(err => alert("Błąd zapisu: upewnij się, że serwer w PowerShellu działa! Szczegóły: " + err.message));
+        });
+
+        function otworzEdycje(id) {
+            const z = wszystkieZlecenia.find(x => x.id === id);
+            if (!z) return;
+            document.getElementById('edit_id').value = z.id;
+            document.getElementById('edit_id_zlecenia').value = z.id_zlecenia;
+            document.getElementById('edit_klient').value = z.klient;
+            document.getElementById('edit_telefon').value = z.telefon || '';
+            document.getElementById('edit_pojazd').value = z.pojazd;
+            document.getElementById('edit_nr_rej').value = z.nr_rejestracyjny || '';
+            document.getElementById('edit_vin').value = z.vin || '';
+            document.getElementById('edit_mechanik').value = z.mechanik;
+            document.getElementById('edit_data_przyj').value = z.data_przyjecia;
+            document.getElementById('edit_data_zak').value = z.data_zakonczenia || '';
+            document.getElementById('edit_status').value = z.status_naprawy;
+            document.getElementById('edit_czesci').value = z.koszt_czesci || 0;
+            document.getElementById('edit_robocizna').value = z.koszt_robocizny || 0;
+            document.getElementById('edit_wplacono').value = z.wplacono || 0;
+            document.getElementById('edit_opis').value = z.opis_czesci || '';
+            document.getElementById('edit_olej_nazwa').value = z.olej_nazwa || 'Brak';
+            document.getElementById('edit_olej_ilosc').value = z.olej_ilosc || 0;
+            document.getElementById('edit_czesci_klienta').checked = (z.czesci_klienta === 1);
+            document.getElementById('edit_hamulcowy').checked = (z.plyn_hamulcowy === 1);
+            document.getElementById('edit_chlodniczy').checked = (z.plyn_chlodniczy === 1);
+
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        function zamknijModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        function zapiszEdycje() {
+            const id = document.getElementById('edit_id').value;
+            const data = {
+                id_zlecenia: document.getElementById('edit_id_zlecenia').value,
+                klient: document.getElementById('edit_klient').value,
+                telefon: document.getElementById('edit_telefon').value,
+                pojazd: document.getElementById('edit_pojazd').value,
+                nr_rejestracyjny: document.getElementById('edit_nr_rej').value,
+                vin: document.getElementById('edit_vin').value,
+                mechanik: document.getElementById('edit_mechanik').value,
+                data_przyjecia: document.getElementById('edit_data_przyj').value,
+                data_zakonczenia: document.getElementById('edit_data_zak').value,
+                status_naprawy: document.getElementById('edit_status').value,
+                koszt_czesci: parseFloat(document.getElementById('edit_czesci').value) || 0,
+                koszt_robocizny: parseFloat(document.getElementById('edit_robocizna').value) || 0,
+                wplacono: parseFloat(document.getElementById('edit_wplacono').value) || 0,
+                opis_czesci: document.getElementById('edit_opis').value,
+                olej_nazwa: document.getElementById('edit_olej_nazwa').value,
+                olej_ilosc: parseFloat(document.getElementById('edit_olej_ilosc').value) || 0,
+                czesci_klienta: document.getElementById('edit_czesci_klienta').checked ? 1 : 0,
+                plyn_hamulcowy: document.getElementById('edit_hamulcowy').checked ? 1 : 0,
+                plyn_chlodniczy: document.getElementById('edit_chlodniczy').checked ? 1 : 0
+            };
+
+            fetch(`${API}/zlecenia/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(() => {
+                zamknijModal();
+                odswiezWszystko();
+            });
+        }
+
+        function usunZlecenie(id) {
+            if (confirm('Na pewno trwale usunąć to zlecenie?')) {
+                fetch(`${API}/zlecenia/${id}`, { method: 'DELETE' })
+                .then(() => odswiezWszystko());
+            }
+        }
+
+        function renderujBazeKlientow() {
+            const filtr = (document.getElementById('szukajKlienta').value || '').toLowerCase();
+            const klienciMap = {};
+
+            wszystkieZlecenia.forEach(z => {
+                const klucz = `${z.klient.trim()}_${(z.telefon || '').trim()}`;
+                if (!klienciMap[klucz]) {
+                    klienciMap[klucz] = {
+                        klient: z.klient,
+                        telefon: z.telefon || '',
+                        pojazdy: new Set(),
+                        liczba: 0,
+                        kwota: 0
+                    };
+                }
+                klienciMap[klucz].pojazdy.add(`${z.pojazd} (${z.nr_rejestracyjny || 'brak rej.'})`);
+                klienciMap[klucz].liczba += 1;
+                klienciMap[klucz].kwota += ((z.koszt_czesci || 0) + (z.koszt_robocizny || 0));
+            });
+
+            const tbody = document.getElementById('tabelaKlientow');
+            tbody.innerHTML = '';
+
+            Object.values(klienciMap).forEach(k => {
+                const autaTekst = Array.from(k.pojazdy).join(', ');
+                if (filtr && !k.klient.toLowerCase().includes(filtr) && !k.telefon.includes(filtr) && !autaTekst.toLowerCase().includes(filtr)) {
+                    return;
+                }
+                const telCzysty = k.telefon.replace(/\s+/g, '');
+                tbody.innerHTML += `<tr>
+                    <td><b>${k.klient}</b></td>
+                    <td>${k.telefon || '-'}</td>
+                    <td>${autaTekst}</td>
+                    <td>${k.liczba}</td>
+                    <td><b>${k.kwota.toFixed(2)} zł</b></td>
+                    <td>
+                        ${telCzysty ? `<a href="sms:${telCzysty}?body=Dzien dobry, informacja z warsztatu Wrobel Motors odnosnie samochodu." style="color:#4ade80; margin-right:10px; text-decoration:none; font-weight:bold;">📱 SMS</a>
+                        <a href="https://wa.me/48${telCzysty}" target="_blank" style="color:#38bdf8; text-decoration:none; font-weight:bold;">💬 WhatsApp</a>` : '-'}
+                    </td>
+                </tr>`;
+            });
+        }
+
+        function pobierzMagazyn() {
+            fetch(`${API}/magazyn`)
+                .then(res => res.json())
+                .then(data => {
+                    magazynDane = data;
+                    const tbody = document.getElementById('tabelaMagazyn');
+                    const selectOlej = document.getElementById('olej_select');
+                    tbody.innerHTML = '';
+                    selectOlej.innerHTML = '<option value="0|Brak">Brak wymiany oleju</option>';
+
+                    data.forEach(m => {
+                        const czyAlarm = m.ilosc <= m.minimum_alarm;
+                        if (m.kategoria === 'Olej silnikowy') {
+                            selectOlej.innerHTML += `<option value="${m.id}|${m.nazwa}">${m.nazwa} (Stan: ${m.ilosc} ${m.jednostka})</option>`;
+                        }
+
+                        tbody.innerHTML += `<tr class="${czyAlarm ? 'mag-alarm' : ''}">
+                            <td><b>${m.nazwa}</b> ${czyAlarm ? '⚠️ NISKI STAN!' : ''}</td>
+                            <td>${m.kategoria}</td>
+                            <td><b>${m.ilosc.toFixed(1)} ${m.jednostka}</b></td>
+                            <td>${m.minimum_alarm} ${m.jednostka}</td>
+                            <td>${m.cena_za_jedn.toFixed(2)} zł</td>
+                            <td>
+                                <button class="btn-sm btn-success" onclick="zmienStanMagazynu(${m.id}, 5)">+5L</button>
+                                <button class="btn-sm btn-success" onclick="zmienStanMagazynu(${m.id}, 1)">+1L</button>
+                                <button class="btn-sm btn-edit" onclick="zmienStanMagazynu(${m.id}, -1)">-1L</button>
+                                <button class="btn-sm btn-del" onclick="usunMagazyn(${m.id})">🗑️</button>
+                            </td>
+                        </tr>`;
+                    });
+                });
+        }
+
+        function dodajProduktMagazyn() {
+            const item = {
+                nazwa: document.getElementById('magNazwa').value,
+                kategoria: document.getElementById('magKat').value,
+                ilosc: parseFloat(document.getElementById('magIlosc').value) || 0,
+                jednostka: document.getElementById('magJedn').value || 'L',
+                cena_za_jedn: parseFloat(document.getElementById('magCena').value) || 0,
+                minimum_alarm: parseFloat(document.getElementById('magAlarm').value) || 5
+            };
+            if (!item.nazwa) return alert('Podaj nazwę produktu!');
+            fetch(`${API}/magazyn`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(item)
+            }).then(() => {
+                document.getElementById('magNazwa').value = '';
+                pobierzMagazyn();
+            });
+        }
+
+        function zmienStanMagazynu(id, zmiana) {
+            fetch(`${API}/magazyn/${id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ zmiana })
+            }).then(() => pobierzMagazyn());
+        }
+
+        function usunMagazyn(id) {
+            if (confirm('Usunąć ten produkt z magazynu?')) {
+                fetch(`${API}/magazyn/${id}`, { method: 'DELETE' }).then(() => pobierzMagazyn());
+            }
+        }
+
+        function przeliczBilanse() {
+            let rob = 0, czesci = 0, wplacono = 0;
+            let kubaRob = 0, kubaAuta = 0, damianRob = 0, damianAuta = 0;
+
+            wszystkieZlecenia.forEach(z => {
+                rob += (z.koszt_robocizny || 0);
+                czesci += (z.koszt_czesci || 0);
+                wplacono += (z.wplacono || 0);
+
+                if (z.mechanik === 'Kuba') {
+                    kubaRob += (z.koszt_robocizny || 0);
+                    kubaAuta++;
+                } else if (z.mechanik === 'Damian') {
+                    damianRob += (z.koszt_robocizny || 0);
+                    damianAuta++;
+                }
+            });
+
+            const obrot = rob + czesci;
+            const doZapl = obrot - wplacono;
+
+            document.getElementById('bWszystkie').innerText = wszystkieZlecenia.length;
+            document.getElementById('bRobocizna').innerText = rob.toFixed(2) + ' zł';
+            document.getElementById('bCzesci').innerText = czesci.toFixed(2) + ' zł';
+            document.getElementById('bObrot').innerText = obrot.toFixed(2) + ' zł';
+            document.getElementById('bWplacono').innerText = wplacono.toFixed(2) + ' zł';
+            document.getElementById('bDoZapl').innerText = doZapl.toFixed(2) + ' zł';
+
+            document.getElementById('bKubaRob').innerText = kubaRob.toFixed(2) + ' zł';
+            document.getElementById('bKubaAuta').innerText = `${kubaAuta} zleceń`;
+            document.getElementById('bDamianRob').innerText = damianRob.toFixed(2) + ' zł';
+            document.getElementById('bDamianAuta').innerText = `${damianAuta} zleceń`;
+        }
+    </script>
+</body>
+</html>
